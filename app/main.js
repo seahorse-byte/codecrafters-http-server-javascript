@@ -26,6 +26,17 @@ function handlePath(path, headers, method, body) {
     return "HTTP/1.1 200 OK\r\n\r\n";
   } else if (path.startsWith("/echo/")) {
     const str = path.split("/")[2];
+    const acceptEncodingHeader = headers["Accept-Encoding"] || "";
+    if (acceptEncodingHeader.includes("gzip")) {
+      // const gzip = require("zlib").createGzip();
+      // const gzipStream = gzip.createStream();
+      // gzipStream.write(str);
+      // gzipStream.end();
+      // return `HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: gzip\r\nContent-Length: ${
+      //   gzipStream.readableLength
+      // }\r\n\r\n${gzipStream.read()}`;
+      return `HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Encoding: gzip\r\nContent-Length: ${str.length}\r\n\r\n${str}`;
+    }
     return `HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: ${str.length}\r\n\r\n${str}`;
   } else if (path.startsWith("/user-agent")) {
     const userAgent = headers["User-Agent"] || "";
@@ -61,6 +72,7 @@ const server = net.createServer((socket) => {
   socket.on("data", (data) => {
     // 1. Convert the data Buffer to a string
     const requestString = data.toString();
+    console.log("requestString", requestString);
     const headers = parseHeaders(requestString);
     const path = requestString.split(" ")[1];
     const method = requestString.split(" ")[0];
