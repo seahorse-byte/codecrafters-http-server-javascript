@@ -97,132 +97,255 @@ const directory =
   directoryFlagIndex !== -1 ? args[directoryFlagIndex + 1] : "/tmp/"; // Get the path
 
 function parseHeaders(requestString) {
-  const headers = {};
+  const headers = {}; // Create a NEW object here
   const lines = requestString.split("\r\n");
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i];
     if (line) {
-      const [key, value] = line.split(": ", 2); // Split only on the first ": "
+      const [key, value] = line.split(": ", 2);
       if (key && value) {
-        headers[key] = value;
+        headers[key.toLowerCase()] = value;
       }
     }
   }
   return headers;
 }
 
+// function handlePath(socket, path, headers, method, bodyBuffer) {
+//   if (path === "/") {
+//     socket.write("HTTP/1.1 200 OK\r\n\r\n");
+//     if (headers["Connection"] === "close") {
+//       socket.end();
+//     }
+//   } else if (path.startsWith("/echo/")) {
+//     const str = path.split("/")[2]; // get the string after /echo/
+//     const acceptEncodingHeader = headers["Accept-Encoding"] || ""; // get the accept encoding header
+
+//     if (acceptEncodingHeader.includes("gzip")) {
+//       const compressedBody = zlib.gzipSync(str); // compress the string
+
+//       // 2. Write text headers [Content-Type, Content-Encoding, Content-Length, End of headers]
+//       socket.write("HTTP/1.1 200 OK\r\n");
+//       socket.write("Content-Type: text/plain\r\n");
+//       socket.write("Content-Encoding: gzip\r\n");
+//       socket.write(`Content-Length: ${compressedBody.length}\r\n`);
+//       socket.write("\r\n"); // End of headers
+
+//       // 3. Write the binary Buffer and end socket
+//       socket.write(compressedBody);
+//       if (headers["Connection"] === "close") {
+//         socket.end();
+//       }
+//     } else {
+//       // here no compression, just send as a normal string
+//       socket.write("HTTP/1.1 200 OK\r\n");
+
+//       // 2. Write text headers [Content-Type, Content-Length, End of headers]
+//       socket.write("Content-Type: text/plain\r\n");
+//       socket.write(`Content-Length: ${str.length}\r\n`);
+//       socket.write("\r\n"); // End of headers
+
+//       // 3. Write the string and end socket
+//       socket.write(str);
+//       if (headers["Connection"] === "close") {
+//         socket.end();
+//       }
+//     }
+//   } else if (path.startsWith("/user-agent")) {
+//     const userAgent = headers["User-Agent"] || "";
+//     socket.write("HTTP/1.1 200 OK\r\n");
+
+//     // 2. Write text headers [Content-Type, Content-Length, End of headers]
+//     socket.write("Content-Type: text/plain\r\n");
+//     socket.write(`Content-Length: ${userAgent.length}\r\n`);
+//     socket.write("\r\n"); // End of headers
+
+//     // 3. Write the string and end socket
+//     socket.write(userAgent);
+//     if (headers["Connection"] === "close") {
+//       socket.write("Connection: close\r\n");
+//       socket.end();
+//     }
+//   } else if (path.startsWith("/files/")) {
+//     const filename = path.split("/")[2];
+//     const filePath = `${directory}${filename}`;
+
+//     // end socket connection on if client sends Connection: close
+
+//     if (method === "POST") {
+//       try {
+//         // bodyBuffer is now a raw, uncorrupted Buffer
+//         fs.writeFileSync(filePath, bodyBuffer);
+//         socket.write("HTTP/1.1 201 Created\r\n\r\n");
+//         if (headers["Connection"] === "close") {
+//           socket.write("Connection: close\r\n");
+//           socket.end();
+//         }
+//       } catch (error) {
+//         socket.write("HTTP/1.1 500 Internal Server Error\r\n\r\n");
+//         if (headers["Connection"] === "close") {
+//           socket.write("Connection: close\r\n");
+//           socket.end();
+//         }
+//       }
+//     } else {
+//       // GET method
+//       try {
+//         // 1. Read the file as a Buffer
+//         const fileContent = fs.readFileSync(filePath);
+
+//         // 2. Write headers [Content-Type, Content-Length, End of headers]
+//         socket.write("HTTP/1.1 200 OK\r\n");
+//         socket.write("Content-Type: application/octet-stream\r\n");
+//         socket.write(`Content-Length: ${fileContent.length}\r\n`);
+//         socket.write("\r\n"); // End of headers
+
+//         // 3. Write the binary Buffer and end socket
+//         socket.write(fileContent);
+//         if (headers["Connection"] === "close") {
+//           socket.write("Connection: close\r\n");
+//           socket.end();
+//         }
+//       } catch (error) {
+//         // If file doesn't exist or error reading file
+//         socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
+//         if (headers["Connection"] === "close") {
+//           socket.write("Connection: close\r\n");
+//           socket.end();
+//         }
+//       }
+//     }
+//   } else {
+//     // If path doesn't match any of the above
+//     // 1. Write headers [Content-Type, Content-Length, End of headers]
+//     socket.write("HTTP/1.1 404 Not Found\r\n");
+//     socket.write("Content-Type: text/plain\r\n");
+//     socket.write("Content-Length: 0\r\n");
+//     socket.write("\r\n"); // End of headers
+
+//     // 2. End socket
+//     if (headers["Connection"] === "close") {
+//       socket.write("Connection: close\r\n");
+//       socket.end();
+//     }
+//   }
+// }
+
+// This function replaces your entire handlePath function
 function handlePath(socket, path, headers, method, bodyBuffer) {
+  // Check the connection header once
+  const connectionHeader = headers["connection"]; // e.g., "close" or undefined
+  const closeConnection = connectionHeader === "close";
+
   if (path === "/") {
-    socket.write("HTTP/1.1 200 OK\r\n\r\n");
-    if (headers["Connection"] === "close") {
-      socket.end();
+    let responseHeaders = "HTTP/1.1 200 OK\r\n";
+    if (closeConnection) {
+      responseHeaders += "Connection: close\r\n";
     }
+    responseHeaders += "\r\n"; // End of headers
+
+    socket.write(responseHeaders);
   } else if (path.startsWith("/echo/")) {
-    const str = path.split("/")[2]; // get the string after /echo/
-    const acceptEncodingHeader = headers["Accept-Encoding"] || ""; // get the accept encoding header
+    const str = path.split("/")[2];
+    const acceptEncodingHeader = headers["accept-encoding"] || "";
 
     if (acceptEncodingHeader.includes("gzip")) {
-      const compressedBody = zlib.gzipSync(str); // compress the string
+      const compressedBody = zlib.gzipSync(str);
 
-      // 2. Write text headers [Content-Type, Content-Encoding, Content-Length, End of headers]
-      socket.write("HTTP/1.1 200 OK\r\n");
-      socket.write("Content-Type: text/plain\r\n");
-      socket.write("Content-Encoding: gzip\r\n");
-      socket.write(`Content-Length: ${compressedBody.length}\r\n`);
-      socket.write("\r\n"); // End of headers
+      let responseHeaders = "HTTP/1.1 200 OK\r\n";
+      responseHeaders += "Content-Type: text/plain\r\n";
+      responseHeaders += "Content-Encoding: gzip\r\n";
+      responseHeaders += `Content-Length: ${compressedBody.length}\r\n`;
+      if (closeConnection) {
+        responseHeaders += "Connection: close\r\n";
+      }
+      responseHeaders += "\r\n"; // End of headers
 
-      // 3. Write the binary Buffer and end socket
+      socket.write(responseHeaders);
       socket.write(compressedBody);
-      if (headers["Connection"] === "close") {
-        socket.end();
-      }
     } else {
-      // here no compression, just send as a normal string
-      socket.write("HTTP/1.1 200 OK\r\n");
-
-      // 2. Write text headers [Content-Type, Content-Length, End of headers]
-      socket.write("Content-Type: text/plain\r\n");
-      socket.write(`Content-Length: ${str.length}\r\n`);
-      socket.write("\r\n"); // End of headers
-
-      // 3. Write the string and end socket
-      socket.write(str);
-      if (headers["Connection"] === "close") {
-        socket.end();
+      let responseHeaders = "HTTP/1.1 200 OK\r\n";
+      responseHeaders += "Content-Type: text/plain\r\n";
+      responseHeaders += `Content-Length: ${str.length}\r\n`;
+      if (closeConnection) {
+        responseHeaders += "Connection: close\r\n";
       }
+      responseHeaders += "\r\n"; // End of headers
+
+      socket.write(responseHeaders);
+      socket.write(str);
     }
   } else if (path.startsWith("/user-agent")) {
-    const userAgent = headers["User-Agent"] || "";
-    socket.write("HTTP/1.1 200 OK\r\n");
+    const userAgent = headers["user-agent"] || "";
 
-    // 2. Write text headers [Content-Type, Content-Length, End of headers]
-    socket.write("Content-Type: text/plain\r\n");
-    socket.write(`Content-Length: ${userAgent.length}\r\n`);
-    socket.write("\r\n"); // End of headers
-
-    // 3. Write the string and end socket
-    socket.write(userAgent);
-    if (headers["Connection"] === "close") {
-      socket.end();
+    let responseHeaders = "HTTP/1.1 200 OK\r\n";
+    responseHeaders += "Content-Type: text/plain\r\n";
+    responseHeaders += `Content-Length: ${userAgent.length}\r\n`;
+    if (closeConnection) {
+      responseHeaders += "Connection: close\r\n";
     }
+    responseHeaders += "\r\n"; // End of headers
+
+    socket.write(responseHeaders);
+    socket.write(userAgent);
   } else if (path.startsWith("/files/")) {
     const filename = path.split("/")[2];
     const filePath = `${directory}${filename}`;
 
-    // end socket connection on if client sends Connection: close
-
     if (method === "POST") {
       try {
-        // bodyBuffer is now a raw, uncorrupted Buffer
         fs.writeFileSync(filePath, bodyBuffer);
-        socket.write("HTTP/1.1 201 Created\r\n\r\n");
-        if (headers["Connection"] === "close") {
-          socket.end();
+
+        let responseHeaders = "HTTP/1.1 201 Created\r\n";
+        if (closeConnection) {
+          responseHeaders += "Connection: close\r\n";
         }
+        responseHeaders += "\r\n"; // End of headers
+        socket.write(responseHeaders);
       } catch (error) {
-        socket.write("HTTP/1.1 500 Internal Server Error\r\n\r\n");
-        if (headers["Connection"] === "close") {
-          socket.end();
+        let responseHeaders = "HTTP/1.1 500 Internal Server Error\r\n";
+        if (closeConnection) {
+          responseHeaders += "Connection: close\r\n";
         }
+        responseHeaders += "\r\n"; // End of headers
+        socket.write(responseHeaders);
       }
     } else {
       // GET method
       try {
-        // 1. Read the file as a Buffer
         const fileContent = fs.readFileSync(filePath);
 
-        // 2. Write headers [Content-Type, Content-Length, End of headers]
-        socket.write("HTTP/1.1 200 OK\r\n");
-        socket.write("Content-Type: application/octet-stream\r\n");
-        socket.write(`Content-Length: ${fileContent.length}\r\n`);
-        socket.write("\r\n"); // End of headers
+        let responseHeaders = "HTTP/1.1 200 OK\r\n";
+        responseHeaders += "Content-Type: application/octet-stream\r\n";
+        responseHeaders += `Content-Length: ${fileContent.length}\r\n`;
+        if (closeConnection) {
+          responseHeaders += "Connection: close\r\n";
+        }
+        responseHeaders += "\r\n"; // End of headers
 
-        // 3. Write the binary Buffer and end socket
+        socket.write(responseHeaders);
         socket.write(fileContent);
-        if (headers["Connection"] === "close") {
-          socket.end();
-        }
       } catch (error) {
-        // If file doesn't exist or error reading file
-        socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
-        if (headers["Connection"] === "close") {
-          socket.end();
+        let responseHeaders = "HTTP/1.1 404 Not Found\r\n";
+        if (closeConnection) {
+          responseHeaders += "Connection: close\r\n";
         }
+        responseHeaders += "\r\n"; // End of headers
+        socket.write(responseHeaders);
       }
     }
   } else {
-    // If path doesn't match any of the above
-
-    // 1. Write headers [Content-Type, Content-Length, End of headers]
-    socket.write("HTTP/1.1 404 Not Found\r\n");
-    socket.write("Content-Type: text/plain\r\n");
-    socket.write("Content-Length: 0\r\n");
-    socket.write("\r\n"); // End of headers
-
-    // 2. End socket
-    if (headers["Connection"] === "close") {
-      socket.end();
+    let responseHeaders = "HTTP/1.1 404 Not Found\r\n";
+    if (closeConnection) {
+      responseHeaders += "Connection: close\r\n";
     }
+    responseHeaders += "\r\n"; // End of headers
+    socket.write(responseHeaders);
+  }
+
+  // Finally, check if we need to close the socket
+  if (closeConnection) {
+    socket.end();
   }
 }
 
@@ -247,10 +370,6 @@ const server = net.createServer((socket) => {
 
     // Pass the socket and the raw bodyBuffer to handlePath - let handlePath write the response
     handlePath(socket, path, headers, method, bodyBuffer);
-  });
-
-  socket.on("close", () => {
-    socket.end();
   });
 
   socket.on("error", (err) => {
