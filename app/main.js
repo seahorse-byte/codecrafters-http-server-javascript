@@ -111,11 +111,12 @@ function parseHeaders(requestString) {
   return headers;
 }
 
-// NOTE: socket is now the first argument
 function handlePath(socket, path, headers, method, bodyBuffer) {
   if (path === "/") {
     socket.write("HTTP/1.1 200 OK\r\n\r\n");
-    socket.end();
+    if (headers["Connection"] === "close") {
+      socket.end();
+    }
   } else if (path.startsWith("/echo/")) {
     const str = path.split("/")[2]; // get the string after /echo/
     const acceptEncodingHeader = headers["Accept-Encoding"] || ""; // get the accept encoding header
@@ -132,7 +133,9 @@ function handlePath(socket, path, headers, method, bodyBuffer) {
 
       // 3. Write the binary Buffer and end socket
       socket.write(compressedBody);
-      socket.end();
+      if (headers["Connection"] === "close") {
+        socket.end();
+      }
     } else {
       // here no compression, just send as a normal string
       socket.write("HTTP/1.1 200 OK\r\n");
@@ -144,7 +147,9 @@ function handlePath(socket, path, headers, method, bodyBuffer) {
 
       // 3. Write the string and end socket
       socket.write(str);
-      socket.end();
+      if (headers["Connection"] === "close") {
+        socket.end();
+      }
     }
   } else if (path.startsWith("/user-agent")) {
     const userAgent = headers["User-Agent"] || "";
@@ -157,20 +162,28 @@ function handlePath(socket, path, headers, method, bodyBuffer) {
 
     // 3. Write the string and end socket
     socket.write(userAgent);
-    socket.end();
+    if (headers["Connection"] === "close") {
+      socket.end();
+    }
   } else if (path.startsWith("/files/")) {
     const filename = path.split("/")[2];
     const filePath = `${directory}${filename}`;
+
+    // end socket connection on if client sends Connection: close
 
     if (method === "POST") {
       try {
         // bodyBuffer is now a raw, uncorrupted Buffer
         fs.writeFileSync(filePath, bodyBuffer);
         socket.write("HTTP/1.1 201 Created\r\n\r\n");
-        socket.end();
+        if (headers["Connection"] === "close") {
+          socket.end();
+        }
       } catch (error) {
         socket.write("HTTP/1.1 500 Internal Server Error\r\n\r\n");
-        socket.end();
+        if (headers["Connection"] === "close") {
+          socket.end();
+        }
       }
     } else {
       // GET method
@@ -186,11 +199,15 @@ function handlePath(socket, path, headers, method, bodyBuffer) {
 
         // 3. Write the binary Buffer and end socket
         socket.write(fileContent);
-        socket.end();
+        if (headers["Connection"] === "close") {
+          socket.end();
+        }
       } catch (error) {
         // If file doesn't exist or error reading file
         socket.write("HTTP/1.1 404 Not Found\r\n\r\n");
-        socket.end();
+        if (headers["Connection"] === "close") {
+          socket.end();
+        }
       }
     }
   } else {
@@ -203,7 +220,9 @@ function handlePath(socket, path, headers, method, bodyBuffer) {
     socket.write("\r\n"); // End of headers
 
     // 2. End socket
-    socket.end();
+    if (headers["Connection"] === "close") {
+      socket.end();
+    }
   }
 }
 
